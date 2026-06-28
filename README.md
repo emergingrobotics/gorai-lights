@@ -19,7 +19,7 @@ pieces find each other by NATS subject.
 | Tasmota light | **tool** (actuator) | calls `gorai.<ns>.tasmota.porch.command` |
 | "turn light on" signal | **event** | reacts to `gorai.<ns>.button.event` |
 
-`<ns>` is the subject namespace the runtime uses (currently `gorai`).
+`<ns>` is the robot's namespace — it defaults to the robot name, so here it is `lights` (subjects are `gorai.lights.…`).
 
 ### The logic
 
@@ -61,7 +61,7 @@ Watch the logs: the scheduler reports the GPS-disciplined clock and every light
 command it emits. Publish a manual turn-on event to see the event path:
 
 ```bash
-nats pub gorai.gorai.button.event '{}'
+nats pub gorai.lights.button.event '{}'
 ```
 
 ## Configuration (`robot.json`)
