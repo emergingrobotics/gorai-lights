@@ -4,3 +4,5 @@
 bin/
 .llm/
 vendor/
+go.work
+go.work.sum
