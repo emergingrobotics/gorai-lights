@@ -1,0 +1,20 @@
+{
+  "version": "2",
+  "robot": { "name": "lights", "description": "Test fixture: explicit timezone override wins over GPS" },
+  "nats": { "embedded": true, "url": "nats://127.0.0.1:14804" },
+  "dashboard": { "enabled": false },
+  "components": [
+    { "name": "gps", "type": "gps", "model": "inject", "attributes": {} }
+  ],
+  "services": [
+    { "name": "porch-light", "type": "tasmota", "model": "sim", "attributes": { "device": "porch" } },
+    { "name": "lights", "type": "scheduler", "model": "lights",
+      "attributes": {
+        "timezone": "Asia/Kolkata",
+        "lights": [
+          { "name": "porch", "device": "porch", "schedule": [ { "on": "19:00", "off": "23:00" } ] }
+        ]
+      } }
+  ],
+  "discovery": { "enabled": false }
+}

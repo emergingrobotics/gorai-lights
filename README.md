@@ -1,121 +1,110 @@
 # gorai-lights
 
-A tiny, complete [Gorai](../gorai/VISION.md) example robot. It keeps accurate
-time from a **GPS resource** and switches a **Tasmota light tool** on and off at
-prescribed times — or the moment a "turn light on" **event** arrives.
+A small, complete [Gorai](../gorai/VISION.md) example robot: a single binary that reads its
+**GPS position**, derives the **local timezone** and **daily sunrise/sunset** entirely offline, and
+switches a **Tasmota light** on and off on a per-day schedule of clock-time and solar windows —
+all over a NATS mesh.
 
 Disclaimer: This works for me — that's the entire guarantee. Built with AI in the loop, so check your own biases before you love it or hate it on principle. Use at your own risk, fork freely, and don't @ me when it explodes. (But do drop me a note if it helps — pay it forward.)
 
 ## What it shows
 
-This is the smallest honest demonstration of the platform's north star — see
-**[VISION.md](../gorai/VISION.md)**: a robot is a set of **capabilities on a NATS
-mesh** (NCP, the NATS Capability Protocol). Nothing here is wired by hand; the
-pieces find each other by NATS subject.
+The platform's north star (see **[VISION.md](../gorai/VISION.md)**): a robot is a set of
+**capabilities on a NATS mesh** (NCP). Nothing is wired by hand — the pieces find each other by
+NATS subject.
 
 | Role | NCP primitive | Subject |
 |------|---------------|---------|
-| GPS receiver (time source) | **resource** (sensor) | reads `gorai.<ns>.gps.data` |
-| Tasmota light | **tool** (actuator) | calls `gorai.<ns>.tasmota.porch.command` |
-| "turn light on" signal | **event** | reacts to `gorai.<ns>.button.event` |
+| GPS receiver (position source) | **resource** (sensor) | reads `gorai.<ns>.gps.data` |
+| Tasmota light | **tool** (actuator) | publishes `gorai.<ns>.tasmota.<device>.command` |
 
-`<ns>` is the robot's namespace — it defaults to the robot name, so here it is `lights` (subjects are `gorai.lights.…`).
+`<ns>` is the robot's namespace — it defaults to the robot name, so here it is `lights`
+(subjects are `gorai.lights.…`).
 
-### The logic
+### The logic (v3)
 
-1. The **GPS component** (from [`gorai-gps`](../gorai-gps)) streams NMEA sentences.
-   A built-in simulator runs when the device is `/dev/gps-sim`, so no hardware is
-   needed to try it.
-2. The **lights scheduler** (this repo, `services/lights`) parses each `$GPRMC`/`$GPGGA`
-   sentence for **UTC time**, disciplines its clock to GPS (accurate to the second),
-   and once per second checks the schedule.
-3. At `on_time` it invokes the light tool with `{"state":"on"}`; at `off_time`,
-   `{"state":"off"}`. A message on the event subject turns the light on immediately.
+1. The **GPS component** ([`gorai-gps`](../gorai-gps)) streams NMEA. A built-in simulator runs when
+   the device is `/dev/gps-sim`, so no hardware is needed to try it.
+2. The **lights scheduler** (`services/lights`) parses `$GPRMC`/`$GPGGA` for **latitude/longitude**
+   and:
+   - resolves the **IANA timezone** from position via an embedded offline table
+     (`bradfitz/latlong`) — override with `timezone`, falls back to UTC;
+   - computes **sunrise/sunset** locally (`nathan-osman/go-sunrise`);
+   - evaluates each light's **windows** and, on a state change (or on the re-assert tick), publishes
+     `{"state":"on"|"off"}` to the light's command subject.
+3. Wall time is the **system clock** (assume NTP/RTC); GPS supplies *position*, not the clock.
 
-> **Times are UTC** (GPS time is UTC). `on_time: "18:30"` means 18:30 UTC.
+> **Control is a NATS command.** The scheduler never touches a bulb — it publishes a command that a
+> Tasmota capability node (or the built-in simulator) consumes. Any other component on the mesh may
+> publish the same command (a button, a dashboard, a remote operator).
 
-## The Composite Robot in miniature
+## Schedule windows
 
-The light itself is **not** part of this binary. It is a tool exposed on the mesh
-by a separate [`gorai-tasmota`](../gorai-tasmota) capability node, running under the
-same robot namespace. Two binaries, one logical robot — composed at runtime through
-the mesh. That is the [Composite Robot](../gorai/VISION.md) at its smallest.
+Each light has one or more `{ "on": <timespec>, "off": <timespec> }` windows. The light is ON
+whenever now falls inside any window. A `<timespec>` is:
 
-To actually switch a bulb, run a `gorai-tasmota` service that subscribes to its NCP
-tool subject (`gorai.<ns>.tasmota.<device>.command`) and drives the device. That tool
-surface is specified in the gorai-tasmota requirements; until a node is attached, the
-scheduler still runs and logs every command it sends (publish is fire-and-forget, so
-nothing blocks).
+- `"HH:MM"` — wall-clock in the resolved timezone (`"24:00"` allowed only as an `off` boundary);
+- `"sunrise"` / `"sunset"` — today's solar event at the robot's location;
+- `"sunrise±HH:MM"` / `"sunset±HH:MM"` — solar event with a signed offset.
+
+Windows **do not cross midnight** (REQ-CFG-6): the resolved `on` must be before the resolved `off`.
+For overnight coverage use two windows (`22:00`–`24:00` and `00:00`–`06:00`).
 
 ## Run it
 
-Two configs ship with the example:
+The binary registers **both** Tasmota drivers; the config picks one:
 
-| Config | GPS | Tasmota light | Use |
-|--------|-----|---------------|-----|
-| `robot.json` | simulator (`/dev/gps-sim`) | **external** real `gorai-tasmota` node | the real composite-robot pattern |
-| `robot.test.json` | simulator | **simulated** in-process light | fully self-contained test mode |
-
-```bash
-# Compile this robot's binary (plain Go -- no global gorai CLI required)
-make build            # or: go build -o bin/gorai-lights .
-
-# Fully simulated end-to-end -- no hardware, no external services
-make run-test         # builds, then: ./bin/gorai-lights run robot.test.json
-
-# The "real" composition (expects an external gorai-tasmota node)
-make run              # builds, then: ./bin/gorai-lights run robot.json
-```
-
-> **Run *this* binary, not the global `gorai` CLI.** Components live in the binary
-> that blank-imports them (the Caddy model): `main.go` here imports the GPS and the
-> simulated light, so `./bin/gorai-lights run …` has them registered. The global
-> `gorai` CLI only carries core components, so `gorai run robot.test.json` would fail
-> with *"type \"gps\" model \"nmea\" not found in registry"*. The Make targets above
-> already invoke the project binary.
-
-### Test mode (fully simulated)
-
-`robot.test.json` adds a **simulated Tasmota light** (`services/tasmotasim`) alongside
-the **GPS simulator**, so the whole robot runs with nothing attached. Watch the logs:
-the scheduler reports its GPS-disciplined clock and each command it sends; the
-simulated light logs every on/off transition and publishes its state.
-
-Trigger the event path instantly, and watch the light's state resource:
+| Config | GPS | Tasmota driver |
+|--------|-----|----------------|
+| `robot.json` (`make build` / `make run`) | real serial (`/dev/ttyUSB0`) | **real** `gorai-tasmota` HTTP controller — drives Sonoff/Kauf bulbs |
+| `robot.test.json` (`make run-test`) | simulator (`/dev/gps-sim`) | **simulated** in-process light — fully self-contained, no hardware |
 
 ```bash
-nats pub gorai.lights.button.event '{}'      # -> simulated light switches on
-nats sub 'gorai.lights.tasmota.porch.state'  # -> {"device":"porch","state":"on",...}
+make build            # the real robot: links gorai-tasmota's HTTP controller
+make run              # run robot.json (drives real bulbs over the LAN)
+make run-test         # fully simulated end-to-end — no hardware, no external services
 ```
 
-To watch the **schedule** fire without waiting, edit `on_time`/`off_time` in
-`robot.test.json` to the next minute or two (UTC) and re-run.
+> **Run *this* binary, not the global `gorai` CLI** — components live in the binary that
+> blank-imports them (the Caddy model). The Make targets invoke `./bin/gorai-lights`.
+>
+> **Build note:** `make build` links the [`gorai-tasmota`](../gorai-tasmota) HTTP controller, pulled
+> as a normal tagged module dependency (`v0.1.0`) from the Go proxy (see [docs/DESIGN.md](docs/DESIGN.md)
+> §7). `make run-test` produces the same binary and selects the simulator through the config.
 
-## Configuration (`robot.json`)
+Watch `make run-test` and you will see the timezone resolve from the simulated GPS position
+(Golden Gate → `America/Los_Angeles`), the day's sunrise/sunset computed, and each light command as
+it is published and consumed by the simulated light. With `robot.json`, the `tasmota/controller`
+service receives the same commands and issues the HTTP calls to the configured device addresses
+(per-device failures are logged and isolated — one unreachable bulb never blocks the others).
 
-The **base robot** is the GPS component + the scheduler service. The scheduler's
-attributes:
+## Configuration
+
+The scheduler service attributes (see `robot.json`):
 
 | Attribute | Meaning |
 |-----------|---------|
-| `gps` | name of the GPS component to read time from (`gps`) |
-| `light_device` | Tasmota device name → tool subject `…tasmota.<device>.command` |
-| `on_time` / `off_time` | `HH:MM` UTC; omit either to disable that edge |
-| `on_event` | event source name → subject `…<source>.event` (turns light on) |
+| `gps` | name of the GPS component to read position from (default `gps`) |
+| `timezone` | optional IANA override; if omitted, derived from GPS position, else UTC |
+| `location` | optional `{latitude, longitude}` fallback used until a GPS fix arrives |
+| `reconcile_interval` | re-assert cadence (default `60s`) |
+| `lights[]` | each `{ name, device?, schedule:[{on,off}…] }` (`device` defaults to `name`) |
 
-`discovery.enabled` is `false`: this robot is exactly what `robot.json` declares.
-Set it to `true` to let the robot adopt additional tools/resources discovered on the
-mesh (and authorized by its NATS credentials) — see the
-[RDL discovery toggle](../gorai-docs/docs/specifications/robot-definition-language.md).
+## Testing
 
-## Extending it (later)
+`make test` runs the full suite with **no hardware, no external NATS, and no network**:
 
-The design is deliberately open at both ends:
+- pure decision logic — `internal/schedule`, `internal/solar`, `internal/tz`;
+- the scheduler service over embedded NATS — `services/lights`;
+- the **test harness** ([REQUIREMENTS.md](REQUIREMENTS.md) §11) under `test/`:
+  a GPS injector (synthetic NMEA for any lat/long/time), a NATS command recorder, an
+  **every-timezone matrix** (17 zones, DST on both hemispheres, ocean/pole/override fallbacks), and
+  robot fixtures that boot through the real gorai runtime.
 
-- **More tools** — add a physical **button** as a component that publishes to
-  `gorai.<ns>.button.event`; the scheduler already listens and will turn the light on.
-- **More resources** — add sensors (lux, motion, temperature) and have the scheduler
-  (or another agent) react to their readings/events.
+See [docs/DESIGN.md](docs/DESIGN.md) and [docs/TEST-PLAN.md](docs/TEST-PLAN.md).
 
-None of those require changing this service — they are new capabilities on the same
-mesh. That is the whole point.
+## Extending it
+
+The design is open at both ends: add more **tools** (a button publishing a command, more lights) or
+more **resources** (lux, motion, temperature) as capabilities on the same mesh — no change to this
+service required.

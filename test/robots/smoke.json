@@ -1,0 +1,21 @@
+{
+  "version": "2",
+  "robot": { "name": "lights", "description": "Smoke fixture: boots the real runtime with injected GPS and a simulated light" },
+  "nats": { "embedded": true, "url": "nats://127.0.0.1:14899" },
+  "dashboard": { "enabled": false },
+  "components": [
+    { "name": "gps", "type": "gps", "model": "inject", "attributes": {} }
+  ],
+  "services": [
+    { "name": "porch-light", "type": "tasmota", "model": "sim", "attributes": { "device": "porch" } },
+    { "name": "lights", "type": "scheduler", "model": "lights",
+      "attributes": {
+        "timezone": "UTC",
+        "reconcile_interval": "1s",
+        "lights": [
+          { "name": "porch", "device": "porch", "schedule": [ { "on": "00:00", "off": "24:00" } ] }
+        ]
+      } }
+  ],
+  "discovery": { "enabled": false }
+}

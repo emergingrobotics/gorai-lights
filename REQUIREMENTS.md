@@ -310,4 +310,103 @@ No external config file, no DB.
 6. **GPS role** → coordinates only (for timezone + solar); wall-clock from the system/NTP clock.
 7. **Config layout** → two services (`tasmota/controller` owns devices; `scheduler/lights` owns
    schedule), mapped by the shared device name / command subject.
-</content>
+
+---
+
+## 11. Test harness
+
+The existing [docs/TEST-PLAN.md](TEST-PLAN.md) covers unit/integration coverage of the pure
+decision paths and the in-binary wiring. This section specifies a dedicated, reusable **test
+harness** that exercises the robot the way the mesh does: by **injecting GPS over NATS** and
+**observing Tasmota commands over NATS**, with no GPS hardware and no smart-plug hardware. Its
+primary purpose is to prove the **GPS-coordinate → timezone → solar → schedule → NATS command**
+path is correct **for every timezone**.
+
+The harness is testing infrastructure, not shipped robot behavior, but it is part of the spec:
+it is how §5 (timezone), §6 (scheduling), and §7 (control) are verified end-to-end.
+
+### 11.1 Layout
+
+- **REQ-TEST-1 (test folder)** All harness code and fixtures MUST live under a single top-level
+  `test/` folder in this repo, kept out of the production build:
+  ```
+  test/
+  ├── robots/        robot.json fixtures, one per scenario (§11.2)
+  ├── gpsinject/     test-only GPS injector component (§11.3)
+  ├── natslisten/    test-only NATS command/state recorder (§11.4)
+  ├── timezones/     timezone fixture table + the per-zone driver (§11.5)
+  └── harness/       shared setup: embedded NATS, robot boot, assertions (§11.6)
+  ```
+  The harness MUST NOT be imported by `main.go` or any shipped service. It runs only under
+  `go test` / `make test`.
+
+### 11.2 Robot configuration fixtures
+
+- **REQ-TEST-2** `test/robots/` MUST hold a set of `robot.json` fixtures that boot the real
+  `scheduler/lights` and `tasmota/sim` (or `tasmota/controller` in dry-run) services on an
+  **embedded NATS** bus, but replace the real `gps`/`nmea` component with the **GPS injector**
+  (§11.3) so coordinates and time are supplied by the test, not by `/dev/gps-sim`.
+- **REQ-TEST-3** Fixtures MUST cover, at minimum: (a) a clock-only window schedule; (b) a
+  solar-window schedule (`sunrise`/`sunset` ± offset); (c) multiple windows per light per day;
+  (d) an explicit `timezone` override; (e) a no-GPS-fix startup. Each fixture is a named scenario
+  referenced by the relevant test.
+
+### 11.3 GPS injector component (inject arbitrary position for any timezone)
+
+- **REQ-TEST-4 (injector)** `test/gpsinject/` MUST provide a test-only gorai component that
+  registers a distinct model (e.g. `registry.RegisterComponent("gps","inject", …)`) and, instead
+  of reading a serial device, **publishes synthetic GPS data on the same subject the real GPS uses**
+  — `gorai.<namespace>.<gpsname>.data` (built via `subjects.Builder.ComponentData`) — as a
+  `gps.GPSMessage` wire payload (`{"sentence": "<NMEA>"}`), wire-compatible with `gorai-gps`.
+- **REQ-TEST-5 (arbitrary coordinates)** The injector MUST accept a **latitude, longitude, and UTC
+  instant** (from RDL attributes and/or a programmatic API the harness calls) and emit
+  well-formed `$GPRMC` + `$GPGGA` sentences (valid checksum, lat/lon hemisphere fields, date+time)
+  encoding exactly those values. This is the single seam used to place the robot anywhere on Earth.
+- **REQ-TEST-6 (timezone coverage)** The injector MUST be drivable across a coordinate set that
+  resolves to **every timezone the robot can derive** (§5.1): one representative coordinate per IANA
+  zone the offline table can return, plus polar / ocean / no-match coordinates that must fall back
+  to the override or `UTC`. The set lives in `test/timezones/` (§11.5).
+- **REQ-TEST-7** The injector MUST support both a **one-shot** publish (fix at a fixed instant, for
+  deterministic schedule evaluation) and a **continuous** mode (re-publish on an interval, to mimic
+  a live 1 Hz stream). Time MUST be supplied by the test, never read from the wall clock, so results
+  are deterministic.
+
+### 11.4 NATS command listener / recorder
+
+- **REQ-TEST-8 (recorder)** `test/natslisten/` MUST provide a recorder that subscribes to the
+  Tasmota command and state subjects — `gorai.<ns>.tasmota.<device>.command` and
+  `…tasmota.<device>.state` (REQ-ARCH-4) — and records every message with subject, decoded payload,
+  and receipt order, exposing them to tests for assertion (count, ordering, last state per device).
+- **REQ-TEST-9** The recorder MUST support **wildcard** subscription
+  (`gorai.<ns>.tasmota.*.command`) so a test can assert on all devices at once, and MUST be safe for
+  concurrent publication (no dropped or reordered records within a device).
+- **REQ-TEST-10** The recorder MUST provide a **wait-for** primitive (block until N matching
+  messages arrive or a timeout elapses) so timezone/schedule tests are deterministic and do not
+  sleep-and-hope.
+
+### 11.5 Timezone matrix driver
+
+- **REQ-TEST-11 (every-timezone test)** `test/timezones/` MUST define a table mapping
+  `{lat, lng} → expected IANA zone (or fallback)` and a table-driven test that, for each entry:
+  1. boots a robot fixture (§11.2) wired to the GPS injector and the recorder;
+  2. injects a fix at that coordinate and a chosen UTC instant (REQ-TEST-5);
+  3. asserts the robot resolves the **expected timezone** (via REQ-TZ-* derivation) and that a
+     solar/clock window therefore fires the **expected on/off command at the expected local time**,
+     observed on the command subject by the recorder (REQ-TEST-8).
+- **REQ-TEST-12 (DST)** The matrix MUST include at least one zone with a DST transition and assert a
+  clock-time window resolves correctly on both sides of the transition.
+- **REQ-TEST-13 (fallback)** The matrix MUST include no-match coordinates (open ocean, poles) and
+  assert the documented fallback (`timezone` override, else `UTC`) is used rather than an error or
+  crash.
+
+### 11.6 Shared harness + execution
+
+- **REQ-TEST-14** `test/harness/` MUST provide reusable setup that: starts an **embedded NATS
+  server** on an ephemeral port; loads a named fixture (§11.2) through the gorai runtime so the
+  **real** `scheduler/lights` and Tasmota service run; attaches the injector and recorder; and tears
+  everything down cleanly per test (no leaked goroutines, ports, or subscriptions).
+- **REQ-TEST-15** The full harness MUST run under `make test` with **no hardware, no network egress,
+  and no real bulbs**, and MUST be deterministic (injected time, wait-for primitives) so it is
+  CI-safe and non-flaky.
+- **REQ-TEST-16** A harness failure MUST surface which scenario/coordinate/zone failed and the
+  expected-vs-observed command, so a regression points straight at the offending timezone or window.

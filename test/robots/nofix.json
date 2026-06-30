@@ -1,0 +1,21 @@
+{
+  "version": "2",
+  "robot": { "name": "lights", "description": "Test fixture: no GPS fix and no location; solar windows deferred, clock windows still run" },
+  "nats": { "embedded": true, "url": "nats://127.0.0.1:14805" },
+  "dashboard": { "enabled": false },
+  "components": [
+    { "name": "gps", "type": "gps", "model": "inject", "attributes": {} }
+  ],
+  "services": [
+    { "name": "porch-light", "type": "tasmota", "model": "sim", "attributes": { "device": "porch" } },
+    { "name": "garden-light", "type": "tasmota", "model": "sim", "attributes": { "device": "garden" } },
+    { "name": "lights", "type": "scheduler", "model": "lights",
+      "attributes": {
+        "lights": [
+          { "name": "porch", "device": "porch", "schedule": [ { "on": "sunset", "off": "23:00" } ] },
+          { "name": "garden", "device": "garden", "schedule": [ { "on": "06:00", "off": "08:00" } ] }
+        ]
+      } }
+  ],
+  "discovery": { "enabled": false }
+}

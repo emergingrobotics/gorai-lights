@@ -68,3 +68,29 @@ services with no errors (smoke test; documented manual/CI step).
 - Pure packages (`internal/schedule`, `solar`, `tz`, `device`) target high line coverage;
   service packages covered by D/E.
 - A failing test triggers `systematic-debugging` (root cause) before any fix.
+
+## Implementation status (as built)
+
+- **Phase A (device + controller)** — covered in the **gorai-tasmota** module: `internal/device`
+  table tests + `service/controller` unit tests, plus the new self-contained integration
+  framework `gorai-tasmota/test/integration` (embedded NATS drives the real controller against 10
+  HTTP-mocked devices; `make test-integration`). See `gorai-tasmota/REQUIREMENTS.md` §1.
+- **Phase B (pure schedule logic)** — `internal/schedule/schedule_test.go`: timespec parsing,
+  static no-wrap validation, desired-state membership/boundaries, multiple/overlapping windows,
+  solar offsets, DST day, deferral, solar no-wrap violation.
+- **Phase C (solar + tz)** — `internal/solar/solar_test.go` (mid-latitude + polar) and
+  `internal/tz/tz_test.go` (known coordinates, ocean no-match, override→lookup→UTC precedence).
+- **Phase D (scheduler service, embedded NATS)** — `services/lights/lights_test.go`: invalid-config
+  rejection, clock-window on/off/no-change/re-assert, solar deferral without position, location
+  fallback, GPS RMC parsing (valid + void).
+- **Phase E (integration) + REQUIREMENTS §11 harness** — under `test/`:
+  - `gpsinject` — synthetic NMEA injector (round-trip verified against `gorai-gps`).
+  - `natslisten` — wildcard command/state recorder with a deterministic wait-for primitive.
+  - `harness` — embedded NATS + the real scheduler wiring, and `BootFixture` which boots a
+    `robot.json` through the **real gorai runtime**.
+  - `timezones` — the every-timezone matrix (17 zones incl. half-hour offset and the dateline),
+    DST both-sides, and ocean / override / polar fallbacks (REQ-TEST-11..13).
+  - `robots` — embedded `robot.json` fixtures (clock, solar, multi-window, tz-override, no-fix,
+    smoke) + a runtime smoke test that boots `smoke.json` and asserts the simulated light is driven.
+
+All of the above pass under `make test` with no hardware, no external NATS, and no network egress.

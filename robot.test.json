@@ -8,6 +8,7 @@
     "embedded": true,
     "url": "nats://localhost:4222"
   },
+  "dashboard": { "enabled": false },
   "components": [
     {
       "name": "gps",
@@ -24,9 +25,7 @@
       "name": "porch-light",
       "type": "tasmota",
       "model": "sim",
-      "attributes": {
-        "device": "porch"
-      }
+      "attributes": { "device": "porch" }
     },
     {
       "name": "lights",
@@ -34,10 +33,17 @@
       "model": "lights",
       "attributes": {
         "gps": "gps",
-        "light_device": "porch",
-        "on_time": "18:30",
-        "off_time": "23:00",
-        "on_event": "button"
+        "reconcile_interval": "60s",
+        "lights": [
+          {
+            "name": "porch",
+            "device": "porch",
+            "schedule": [
+              { "on": "sunset-00:15", "off": "23:30" },
+              { "on": "05:30", "off": "sunrise+00:10" }
+            ]
+          }
+        ]
       }
     }
   ],

@@ -2,7 +2,7 @@
   "version": "2",
   "robot": {
     "name": "lights",
-    "description": "GPS-timed Tasmota light controller (example robot)"
+    "description": "GPS-located, timezone-aware Tasmota light controller (example robot)"
   },
   "nats": {
     "embedded": true,
@@ -14,22 +14,39 @@
       "type": "gps",
       "model": "nmea",
       "attributes": {
-        "device": "/dev/gps-sim",
+        "device": "/dev/ttyUSB0",
         "baud_rate": 9600
       }
     }
   ],
   "services": [
     {
+      "name": "tasmota",
+      "type": "tasmota",
+      "model": "controller",
+      "attributes": {
+        "devices": [
+          { "name": "porch", "type": "sonoff", "address": "192.168.1.50" }
+        ]
+      }
+    },
+    {
       "name": "lights",
       "type": "scheduler",
       "model": "lights",
       "attributes": {
         "gps": "gps",
-        "light_device": "porch",
-        "on_time": "18:30",
-        "off_time": "23:00",
-        "on_event": "button"
+        "reconcile_interval": "60s",
+        "lights": [
+          {
+            "name": "porch",
+            "device": "porch",
+            "schedule": [
+              { "on": "sunset-00:15", "off": "23:30" },
+              { "on": "05:30", "off": "sunrise+00:10" }
+            ]
+          }
+        ]
       }
     }
   ],

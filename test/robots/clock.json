@@ -1,0 +1,20 @@
+{
+  "version": "2",
+  "robot": { "name": "lights", "description": "Test fixture: clock-only windows, GPS injected" },
+  "nats": { "embedded": true, "url": "nats://127.0.0.1:14801" },
+  "dashboard": { "enabled": false },
+  "components": [
+    { "name": "gps", "type": "gps", "model": "inject", "attributes": {} }
+  ],
+  "services": [
+    { "name": "porch-light", "type": "tasmota", "model": "sim", "attributes": { "device": "porch" } },
+    { "name": "lights", "type": "scheduler", "model": "lights",
+      "attributes": {
+        "timezone": "America/Los_Angeles",
+        "lights": [
+          { "name": "porch", "device": "porch", "schedule": [ { "on": "18:30", "off": "23:00" } ] }
+        ]
+      } }
+  ],
+  "discovery": { "enabled": false }
+}
