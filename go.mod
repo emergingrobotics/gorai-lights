@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/emergingrobotics/gorai v0.2.2
-	github.com/emergingrobotics/gorai-gps v0.1.1
+	github.com/emergingrobotics/gorai-gps v0.1.2
 	github.com/nats-io/nats-server/v2 v2.12.6
 	github.com/nats-io/nats.go v1.49.0
 )

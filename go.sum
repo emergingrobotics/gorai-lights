@@ -11,6 +11,10 @@ github.com/creack/goselect v0.1.2 h1:2DNy14+JPjRBgPzAd1thbQp4BSIihxcBf0IXhQXDRa0
 github.com/creack/goselect v0.1.2/go.mod h1:a/NhLweNvqIYMuxcMOuWY516Cimucms3DglDzQP3hKY=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/emergingrobotics/gorai v0.2.2 h1:mBncviLDA1mRV57dZy7mCX9j4W26+L6iCcyyPRXG3Ec=
+github.com/emergingrobotics/gorai v0.2.2/go.mod h1:ISwWpIxsaHdhEK6kOlJ9/Ejx0ZmjOOLq2DPOt5rz9YY=
+github.com/emergingrobotics/gorai-gps v0.1.2 h1:vcDm0ztuk2GwBChTNm44QfmJVdVfWp6dDfzk/F8gwBs=
+github.com/emergingrobotics/gorai-gps v0.1.2/go.mod h1:R5OX+XakBnFb0tArwjQsGjc36vmoKYA20w8KlB0ih7s=
 github.com/go-chi/chi/v5 v5.1.0 h1:acVI1TYaD+hhedDJ3r54HyA6sExp3HfXq7QWEEY/xMw=
 github.com/go-chi/chi/v5 v5.1.0/go.mod h1:DslCQbL2OYiznFReuXYUmQ2hGd1aDpCnlMNITLSKoi8=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
