@@ -1,10 +1,11 @@
-module github.com/gorai/gorai-lights
+module github.com/emergingrobotics/gorai-lights
 
 go 1.25.0
 
 require (
-	github.com/gorai/gorai v0.3.0
-	github.com/gorai/gorai-gps v0.1.0
+	github.com/emergingrobotics/gorai v0.2.2
+	github.com/emergingrobotics/gorai-gps v0.1.1
+	github.com/nats-io/nats-server/v2 v2.12.6
 	github.com/nats-io/nats.go v1.49.0
 )
 
@@ -22,7 +23,6 @@ require (
 	github.com/minio/highwayhash v1.0.4-0.20251030100505-070ab1a87a76 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nats-io/jwt/v2 v2.8.1 // indirect
-	github.com/nats-io/nats-server/v2 v2.12.6 // indirect
 	github.com/nats-io/nkeys v0.4.15 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/prometheus/client_golang v1.23.2 // indirect
@@ -38,7 +38,3 @@ require (
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/protobuf v1.36.8 // indirect
 )
-
-replace github.com/gorai/gorai => ../gorai
-
-replace github.com/gorai/gorai-gps => ../gorai-gps

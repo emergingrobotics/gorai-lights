@@ -49,20 +49,47 @@ nothing blocks).
 
 ## Run it
 
-```bash
-# Compile (plain Go -- no gorai CLI required)
-make build        # or: go build ./...
+Two configs ship with the example:
 
-# Run with the gorai CLI (embedded NATS, GPS simulator)
-make run          # gorai run robot.json
-```
-
-Watch the logs: the scheduler reports the GPS-disciplined clock and every light
-command it emits. Publish a manual turn-on event to see the event path:
+| Config | GPS | Tasmota light | Use |
+|--------|-----|---------------|-----|
+| `robot.json` | simulator (`/dev/gps-sim`) | **external** real `gorai-tasmota` node | the real composite-robot pattern |
+| `robot.test.json` | simulator | **simulated** in-process light | fully self-contained test mode |
 
 ```bash
-nats pub gorai.lights.button.event '{}'
+# Compile this robot's binary (plain Go -- no global gorai CLI required)
+make build            # or: go build -o bin/gorai-lights .
+
+# Fully simulated end-to-end -- no hardware, no external services
+make run-test         # builds, then: ./bin/gorai-lights run robot.test.json
+
+# The "real" composition (expects an external gorai-tasmota node)
+make run              # builds, then: ./bin/gorai-lights run robot.json
 ```
+
+> **Run *this* binary, not the global `gorai` CLI.** Components live in the binary
+> that blank-imports them (the Caddy model): `main.go` here imports the GPS and the
+> simulated light, so `./bin/gorai-lights run …` has them registered. The global
+> `gorai` CLI only carries core components, so `gorai run robot.test.json` would fail
+> with *"type \"gps\" model \"nmea\" not found in registry"*. The Make targets above
+> already invoke the project binary.
+
+### Test mode (fully simulated)
+
+`robot.test.json` adds a **simulated Tasmota light** (`services/tasmotasim`) alongside
+the **GPS simulator**, so the whole robot runs with nothing attached. Watch the logs:
+the scheduler reports its GPS-disciplined clock and each command it sends; the
+simulated light logs every on/off transition and publishes its state.
+
+Trigger the event path instantly, and watch the light's state resource:
+
+```bash
+nats pub gorai.lights.button.event '{}'      # -> simulated light switches on
+nats sub 'gorai.lights.tasmota.porch.state'  # -> {"device":"porch","state":"on",...}
+```
+
+To watch the **schedule** fire without waiting, edit `on_time`/`off_time` in
+`robot.test.json` to the next minute or two (UTC) and re-run.
 
 ## Configuration (`robot.json`)
 

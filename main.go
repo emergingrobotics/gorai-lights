@@ -8,15 +8,19 @@
 package main
 
 import (
-	gorai "github.com/gorai/gorai/pkg/gorai"
+	gorai "github.com/emergingrobotics/gorai/pkg/gorai"
 
 	// GPS component — an NCP resource (sensor) that streams NMEA on
 	// gorai.<namespace>.gps.data. Registers "gps"/"nmea".
-	_ "github.com/gorai/gorai-gps/component/nmea"
+	_ "github.com/emergingrobotics/gorai-gps/component/nmea"
 
 	// Local lights scheduler — the agent that reads GPS time and calls the
 	// light tool. Registers "scheduler"/"lights".
-	_ "github.com/gorai/gorai-lights/services/lights"
+	_ "github.com/emergingrobotics/gorai-lights/services/lights"
+
+	// Simulated Tasmota light for test mode (used by robot.test.json). Inert
+	// unless the config references it. Registers "tasmota"/"sim".
+	_ "github.com/emergingrobotics/gorai-lights/services/tasmotasim"
 )
 
 func main() {

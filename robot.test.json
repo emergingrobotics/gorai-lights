@@ -1,0 +1,47 @@
+{
+  "version": "2",
+  "robot": {
+    "name": "lights",
+    "description": "gorai-lights in test mode — simulated GPS and simulated Tasmota light, no hardware"
+  },
+  "nats": {
+    "embedded": true,
+    "url": "nats://localhost:4222"
+  },
+  "components": [
+    {
+      "name": "gps",
+      "type": "gps",
+      "model": "nmea",
+      "attributes": {
+        "device": "/dev/gps-sim",
+        "baud_rate": 9600
+      }
+    }
+  ],
+  "services": [
+    {
+      "name": "porch-light",
+      "type": "tasmota",
+      "model": "sim",
+      "attributes": {
+        "device": "porch"
+      }
+    },
+    {
+      "name": "lights",
+      "type": "scheduler",
+      "model": "lights",
+      "attributes": {
+        "gps": "gps",
+        "light_device": "porch",
+        "on_time": "18:30",
+        "off_time": "23:00",
+        "on_event": "button"
+      }
+    }
+  ],
+  "discovery": {
+    "enabled": false
+  }
+}

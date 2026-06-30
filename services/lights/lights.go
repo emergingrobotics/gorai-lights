@@ -24,10 +24,10 @@ import (
 
 	"github.com/nats-io/nats.go"
 
-	"github.com/gorai/gorai/pkg/registry"
-	"github.com/gorai/gorai/pkg/subjects"
+	"github.com/emergingrobotics/gorai/pkg/registry"
+	"github.com/emergingrobotics/gorai/pkg/subjects"
 
-	"github.com/gorai/gorai-gps/pkg/gps"
+	"github.com/emergingrobotics/gorai-gps/pkg/gps"
 )
 
 func init() {

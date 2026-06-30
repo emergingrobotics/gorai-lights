@@ -30,6 +30,14 @@ light), with an **event** path for immediate control. Keep it minimal but real.
   the built-in simulator MUST let the robot run end-to-end without GPS hardware.
 - **REQ-6 — Base robot.** `robot.json` MUST declare the GPS component and the
   scheduler service as the base robot, with `discovery.enabled: false` by default.
+- **REQ-9 — Fully-simulated test mode.** `robot.test.json` MUST run the robot
+  end-to-end with no hardware and no external services: the GPS via the built-in
+  simulator (`/dev/gps-sim`), and the light via an in-process **simulated Tasmota
+  node** (`services/tasmotasim`) that consumes the light tool
+  (`gorai.<namespace>.tasmota.<device>.command`), records on/off state, logs every
+  transition, publishes its state on `…tasmota.<device>.state`, and answers
+  request/reply tool calls. The simulated node MUST be inert unless a config
+  references it.
 
 ## 3. Non-functional / boundaries
 
@@ -43,11 +51,13 @@ light), with an **event** path for immediate control. Keep it minimal but real.
 
 ## 4. Known integration gap
 
-The light only switches when a `gorai-tasmota` capability node is running under the
-same namespace and subscribed to its NCP tool subject
-(`gorai.<namespace>.tasmota.<device>.command`). That tool surface is specified in the
-gorai-tasmota requirements. Until a node is attached, the scheduler runs and logs the
-commands it would send.
+In production (`robot.json`) the light only switches when a real `gorai-tasmota`
+capability node is running under the same namespace and subscribed to its NCP tool
+subject (`gorai.<namespace>.tasmota.<device>.command`). That tool surface is specified
+in the gorai-tasmota requirements. Test mode (`robot.test.json`, REQ-9) closes this gap
+with the bundled simulated node, so the example runs end-to-end on its own. Until a
+node (real or simulated) is attached, the scheduler still runs and logs the commands it
+would send.
 
 ## 5. Out of scope (for now)
 

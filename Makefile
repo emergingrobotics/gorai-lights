@@ -4,7 +4,7 @@ TARGET       ?= $(shell go env GOOS)/$(shell go env GOARCH)
 
 .DEFAULT_GOAL := help
 
-.PHONY: build compile run validate test tidy clean help
+.PHONY: build compile run run-test validate test tidy clean help
 
 build: ## Compile the robot binary (plain go build -- no gorai CLI needed)
 	go build -o bin/$(BINARY_NAME) .
@@ -12,11 +12,14 @@ build: ## Compile the robot binary (plain go build -- no gorai CLI needed)
 compile: ## Type-check everything
 	go build ./...
 
-run: ## Run the robot (requires the gorai CLI)
-	gorai run $(ROBOT_CONFIG)
+run: build ## Run the robot (this project's binary embeds its components)
+	./bin/$(BINARY_NAME) run $(ROBOT_CONFIG)
 
-validate: ## Validate robot.json (requires the gorai CLI)
-	gorai validate $(ROBOT_CONFIG)
+run-test: build ## Run fully simulated (GPS + Tasmota) -- no hardware, no external services
+	./bin/$(BINARY_NAME) run robot.test.json
+
+validate: build ## Validate robot.json
+	./bin/$(BINARY_NAME) validate $(ROBOT_CONFIG)
 
 test: ## Run tests
 	go test ./...
