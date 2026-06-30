@@ -24,7 +24,7 @@ require (
 	github.com/coder/websocket v1.8.12 // indirect
 	github.com/creack/goselect v0.1.2 // indirect
 	github.com/emergingrobotics/gorai-tasmota v0.1.0
-	github.com/go-chi/chi/v5 v5.1.0 // indirect
+	github.com/go-chi/chi/v5 v5.2.4 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/google/go-tpm v0.9.8 // indirect
 	github.com/google/uuid v1.6.0 // indirect
